@@ -1,0 +1,215 @@
+import java.util.Scanner;
+import java.util.regex.Pattern;
+import java.time.Duration;
+import java.time.Instant;
+
+public class OnlineExamSystem {
+    private String firstName;
+    private String middleName;
+    private String lastName;
+    private String username;
+    private String email;
+    private String password;
+    private boolean isLoggedIn;
+    private int questionCount;
+    private int[] userAnswers;
+    private int[] correctAnswers;
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}$");
+    private final Duration examTime = Duration.ofMinutes(10);
+    private boolean examSubmitted = false;
+
+    public OnlineExamSystem(String firstName, String middleName, String lastName, String username, String email, String password) {
+        this.firstName = capitalizeFirstLetter(firstName);
+        this.middleName = capitalizeFirstLetter(middleName);
+        this.lastName = capitalizeFirstLetter(lastName);
+        this.username = username;
+        this.email = email;
+        this.password = capitalizeFirstLetter(password);
+        System.out.println("Successfully registered! :)");
+        this.isLoggedIn = false;
+        this.questionCount = 10;
+        this.userAnswers = new int[questionCount];
+        this.correctAnswers = new int[questionCount];
+        // Initialize correct answers with random values (0 or 1)
+        for (int i = 0; i < questionCount; i++) {
+            correctAnswers[i] = (int) Math.round(Math.random());
+        }
+    }
+
+    public void login() {
+        System.out.println("Log in to give the Exam ");
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Username: ");
+        String inputUsername = scanner.nextLine();
+        System.out.print("Password: ");
+        String inputPassword = scanner.nextLine();
+        if (inputUsername.equals(username) && inputPassword.equals(password) && !inputUsername.equalsIgnoreCase(inputPassword)) {
+            isLoggedIn = true;
+            System.out.println("Login successful. Best of Luck, " + firstName + " " + lastName);
+        } else {
+            System.out.println("Login failed. Please try again.");
+        }
+    }
+
+    public void logout() {
+        isLoggedIn = false;
+        System.out.println("Logout successful.");
+    }
+
+    public void startExam() {
+        if (!isLoggedIn) {
+            System.out.println("Please login first.");
+            return;
+        }
+        Instant examStartTime = Instant.now();
+        Instant examEndTime = examStartTime.plus(examTime);
+        Scanner scanner = new Scanner(System.in);
+
+        // Create a separate thread to continuously display the remaining time
+        Thread timeDisplayThread = new Thread(() -> {
+            while (Instant.now().isBefore(examEndTime) && !examSubmitted) {
+                long timeRemainingSeconds = Duration.between(Instant.now(), examEndTime).getSeconds();
+                System.out.println("Time remaining: " + timeRemainingSeconds / 60 + " minutes and " + timeRemainingSeconds % 60 + " seconds.");
+                try {
+                    Thread.sleep(10000); // Update every 10 seconds
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        timeDisplayThread.start();
+
+        System.out.println("You have 10 minutes to complete the exam.");
+
+        while (Instant.now().isBefore(examEndTime) && !examSubmitted) {
+            for (int i = 0; i < questionCount; i++) {
+                System.out.println("Question " + (i + 1) + ":");
+                System.out.println("1. Option 1");
+                System.out.println("2. Option 2");
+                System.out.print("Your answer (1 or 2): ");
+                int answer = scanner.nextInt();
+                userAnswers[i] = answer;
+            }
+
+            long timeRemaining = Duration.between(Instant.now(), examEndTime).toMillis();
+            if (timeRemaining <= 0) {
+                System.out.println("Time's up! Auto-submitting the exam.");
+                submitExam();
+            }
+
+            System.out.println("Would you like to submit? \n1: Yes \n2: No ");
+            int n = scanner.nextInt();
+            if (n == 1) {
+                submitExam();
+            }
+        }
+    }
+
+    public void submitExam() {
+        if (!isLoggedIn) {
+            System.out.println("Please login first.");
+            return;
+        }
+        examSubmitted = true;
+        int score = 0;
+        for (int i = 0; i < questionCount; i++) {
+            if (userAnswers[i] == correctAnswers[i]) {
+                score++;
+            }
+        }
+        System.out.println("Your score is " + score + " out of " + questionCount + ".");
+        System.out.println("Best of luck, " + getFullName());
+        logout();
+    }
+
+    private String capitalizeFirstLetter(String str) {
+        if (str != null && !str.isEmpty()) {
+            char[] charArray = str.toCharArray();
+            charArray[0] = Character.toUpperCase(charArray[0]);
+            return new String(charArray);
+        }
+        return str;
+    }
+
+    private String getFullName() {
+        StringBuilder fullName = new StringBuilder(firstName);
+        if (!middleName.isEmpty()) {
+            fullName.append(" ").append(middleName);
+        }
+        fullName.append(" ").append(lastName);
+        return fullName.toString();
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Welcome to Online Exam System\n");
+        System.out.println("Register for the Exam:");
+        String fName = getValidName(sc, "First Name");
+        String mName = "";
+        System.out.print("Do you have a Middle Name? (yes/no): ");
+        String hasMiddleName = sc.nextLine().toLowerCase();
+        if (hasMiddleName.equals("yes")) {
+            mName = getValidName(sc, "Middle Name");
+        }
+        String lName = getValidName(sc, "Last Name");
+        String email = null;
+        while (email == null) {
+            System.out.print("Email: ");
+            email = sc.nextLine();
+            if (!isEmailValid(email)) {
+                System.out.println("Please enter a valid email address in lowercase format.");
+                email = null;
+            }
+        }
+        System.out.print("Username: ");
+        String uName = sc.nextLine();
+        String pWord;
+        while (true) {
+            System.out.print("Password: ");
+            pWord = sc.nextLine();
+            if (isPasswordValid(pWord, uName)) {
+                break;
+            } else {
+                System.out.println("Please enter a valid password. It must have a capital first letter, contain at least one special character and one digit, and have a length of 8-16 characters. It should not match your username.");
+            }
+        }
+        OnlineExamSystem examSystem = new OnlineExamSystem(fName, mName, lName, uName, email, pWord);
+        examSystem.login();
+        examSystem.startExam();
+    }
+
+    public static boolean isPasswordValid(String password, String username) {
+        if (password.length() < 8 || password.length() > 16) {
+            return false; // Password length not within the required range
+        }
+        if (!Character.isUpperCase(password.charAt(0)) || !password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\",.<>/?].*")
+                || !password.matches(".*\\d.*") || password.equalsIgnoreCase(username)) {
+            return false; // First letter is not capitalized, missing special character or digit, or matches the username
+        }
+        return true;
+    }
+
+    public static boolean isEmailValid(String email) {
+        return EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    public static String getValidName(Scanner sc, String fieldName) {
+        String name = "";
+        while (true) {
+            System.out.print(fieldName + ": ");
+            name = sc.nextLine();
+            if (isNameValid(name)) {
+                break;
+            } else {
+                System.out.println("Please enter a valid " + fieldName + " with the first letter capitalized.");
+            }
+        }
+        return name;
+    }
+
+    public static boolean isNameValid(String name) {
+        char firstChar = name.charAt(0);
+        return Character.isUpperCase(firstChar);
+    }
+}
